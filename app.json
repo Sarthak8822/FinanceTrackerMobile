@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Finance Tracker",
+    "slug": "finance-tracker-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#6366f1"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.financetracker.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera for profile pictures.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photos for profile pictures."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6366f1"
+      },
+      "package": "com.financetracker.mobile"
+    },
+    "web": {
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1",
+            "newArchEnabled": false
+          }
+        }
+      ]
+    ]
+  }
+}

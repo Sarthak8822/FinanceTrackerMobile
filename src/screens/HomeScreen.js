@@ -206,7 +206,7 @@ const HomeScreen = ({ navigation }) => {
                 <TransactionItem
                   key={transaction.id}
                   transaction={transaction}
-                  onPress={() => navigation.navigate('TransactionDetail', { transaction })}
+                  onPress={() => navigation.navigate('TransactionDetailScreen', { transaction })}
                 />
               ))}
             </View>

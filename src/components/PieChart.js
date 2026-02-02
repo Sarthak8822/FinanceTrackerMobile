@@ -1,4 +1,4 @@
-// components/PieChart.js - Enhanced with Emojis! 🎨
+// components/PieChart.js - UPDATED with Rent and different colors
 
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
@@ -6,41 +6,44 @@ import { PieChart as RNPieChart } from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get('window').width;
 
-// Category Emojis/Icons mapping
-const CATEGORY_EMOJIS = {
+// UPDATED Category Emojis including RENT
+export const CATEGORY_EMOJIS = {
   Food: '🍔',
   Transport: '🚗',
   Shopping: '🛍️',
   Entertainment: '🎮',
   Health: '💊',
   Bills: '⚡',
+  Rent: '🏠',        // NEW - Rent category
+  Education: '📚',
   Salary: '💰',
   Business: '💼',
   Investment: '📈',
-  Education: '📚',
   Other: '💳',
 };
 
-const CATEGORY_COLORS = {
-  Food: '#f59e0b',
-  Transport: '#3b82f6',
-  Shopping: '#ec4899',
-  Entertainment: '#8b5cf6',
-  Health: '#10b981',
-  Bills: '#ef4444',
-  Salary: '#10b981',
-  Business: '#059669',
-  Investment: '#8b5cf6',
-  Education: '#06b6d4',
-  Other: '#6b7280',
+// UPDATED Category Colors - All different
+export const CATEGORY_COLORS = {
+  Food: '#f59e0b',        // Amber
+  Transport: '#3b82f6',   // Blue
+  Shopping: '#ec4899',    // Pink
+  Entertainment: '#8b5cf6', // Purple
+  Health: '#10b981',      // Green
+  Bills: '#ef4444',       // Red
+  Rent: '#06b6d4',        // Cyan - NEW
+  Education: '#8b5cf6',   // Purple
+  Salary: '#10b981',      // Green
+  Business: '#059669',    // Dark Green
+  Investment: '#a855f7',  // Light Purple
+  Other: '#6b7280',       // Gray
 };
 
 /**
  * Beautiful Pie Chart Component with Emojis
- * Shows category-wise expense breakdown with icons
+ * Now shows different colors for each category
  */
 const PieChart = ({ data, showLegend = true, size = 220 }) => {
-  // Transform data for chart
+  // Transform data for chart with DIFFERENT colors
   const chartData = data.map((item) => ({
     name: item.category,
     amount: item.value,
@@ -58,6 +61,15 @@ const PieChart = ({ data, showLegend = true, size = 220 }) => {
     strokeWidth: 2,
     barPercentage: 0.5,
   };
+
+  if (total === 0 || chartData.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyEmoji}>📊</Text>
+        <Text style={styles.emptyText}>No expense data</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -85,7 +97,7 @@ const PieChart = ({ data, showLegend = true, size = 220 }) => {
         </View>
       </View>
 
-      {/* Custom Legend with Emojis */}
+      {/* Custom Legend with Emojis and Different Colors */}
       {showLegend && (
         <View style={styles.legend}>
           {chartData.map((item, index) => {
@@ -106,9 +118,11 @@ const PieChart = ({ data, showLegend = true, size = 220 }) => {
                   <Text style={styles.legendAmount}>
                     ₹{item.amount.toLocaleString('en-IN')}
                   </Text>
-                  <Text style={[styles.legendPercentage, { color: item.color }]}>
-                    {percentage}%
-                  </Text>
+                  <View style={[styles.percentageBadge, { backgroundColor: item.color + '20' }]}>
+                    <Text style={[styles.legendPercentage, { color: item.color }]}>
+                      {percentage}%
+                    </Text>
+                  </View>
                 </View>
               </View>
             );
@@ -122,6 +136,18 @@ const PieChart = ({ data, showLegend = true, size = 220 }) => {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6b7280',
   },
   chartContainer: {
     position: 'relative',
@@ -195,7 +221,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#1f2937',
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  percentageBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   legendPercentage: {
     fontSize: 12,
@@ -204,6 +235,3 @@ const styles = StyleSheet.create({
 });
 
 export default PieChart;
-
-// Export emoji mapping for use in other components
-export { CATEGORY_EMOJIS, CATEGORY_COLORS };

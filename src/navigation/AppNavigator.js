@@ -14,6 +14,7 @@ import AddTransactionScreen from '../screens/AddTransactionScreen';
 import BudgetsScreen from '../screens/BudgetsScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import TransactionDetailScreen from '../screens/TransactionDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -74,6 +75,7 @@ const AppNavigator = () => {
         <Stack.Screen name="Budgets" component={BudgetsScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="TransactionDetailScreen" component={TransactionDetailScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

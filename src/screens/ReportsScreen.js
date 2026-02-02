@@ -1,93 +1,150 @@
-// src/screens/ReportsScreen.js
-import React, { useState, useEffect } from 'react';
+// screens/ReportsScreen.js - FIXED with proper period filtering
+
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
+  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import PieChart from '../components/PieChart';
+import { useFocusEffect } from '@react-navigation/native';
+import {LinearGradient} from 'expo-linear-gradient';
+import PieChart, { CATEGORY_COLORS } from '../components/PieChart';
 import GlassCard from '../components/GlassCard';
-import { 
-  getCurrentUser, 
-  getTransactions,
-  getTransactionSummary,
-} from '../services/api';
-import { colors, fontSize, fontWeight, borderRadius, spacing, getCategoryColor } from '../utils/colors';
+import { getCurrentUser, getTransactions, getTransactionSummary } from '../services/api';
 
 const screenWidth = Dimensions.get('window').width;
 
 const ReportsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
+  const [allTransactions, setAllTransactions] = useState([]);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('All Time');
+  const [selectedPeriod, setSelectedPeriod] = useState('This Month');
+  const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
 
-  useEffect(() => {
-    loadReports();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadReports();
+    }, [])
+  );
 
   const loadReports = async () => {
     try {
       const user = await getCurrentUser();
-      if (!user) return;
+      if (!user) {
+        navigation.replace('Login');
+        return;
+      }
 
-      // Load summary
-      const summaryData = await getTransactionSummary(user.id);
-      setSummary(summaryData);
-
-      // Load all transactions
+      // Load ALL transactions
       const transactions = await getTransactions(user.id);
+      setAllTransactions(transactions);
       
-      // Group expenses by category
-      const expensesByCategory = {};
-      transactions
-        .filter(t => t.type === 'EXPENSE')
-        .forEach(t => {
-          if (expensesByCategory[t.category]) {
-            expensesByCategory[t.category] += parseFloat(t.amount);
-          } else {
-            expensesByCategory[t.category] = parseFloat(t.amount);
-          }
-        });
-
-      // Convert to chart data format
-      const chartData = Object.keys(expensesByCategory).map(category => ({
-        category,
-        value: expensesByCategory[category],
-        color: getCategoryColor(category),
-      }));
-
-      setCategoryData(chartData);
+      // Filter based on selected period
+      filterByPeriod(transactions, selectedPeriod);
     } catch (error) {
-      console.error('Error loading reports:', error);
+      console.error('Load reports error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  const filterByPeriod = (transactions, period) => {
+    const now = new Date();
+    let filtered = [];
+
+    if (period === 'This Month') {
+      // Current month
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      filtered = transactions.filter(t => {
+        const transDate = new Date(t.transactionDate);
+        return transDate >= startOfMonth && transDate <= endOfMonth;
+      });
+    } else if (period === 'Last Month') {
+      // Previous month
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      
+      filtered = transactions.filter(t => {
+        const transDate = new Date(t.transactionDate);
+        return transDate >= startOfLastMonth && transDate <= endOfLastMonth;
+      });
+    } else {
+      // All Time
+      filtered = transactions;
+    }
+
+    setFilteredTransactions(filtered);
+    calculateSummaryAndCategories(filtered);
+  };
+
+  const calculateSummaryAndCategories = (transactions) => {
+    // Calculate summary
+    const income = transactions
+      .filter(t => t.type === 'INCOME')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    
+    const expense = transactions
+      .filter(t => t.type === 'EXPENSE')
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+    setSummary({
+      totalIncome: income,
+      totalExpense: expense,
+      balance: income - expense,
+    });
+
+    // Group expenses by category
+    const expensesByCategory = {};
+    transactions
+      .filter(t => t.type === 'EXPENSE')
+      .forEach(t => {
+        if (expensesByCategory[t.category]) {
+          expensesByCategory[t.category] += parseFloat(t.amount);
+        } else {
+          expensesByCategory[t.category] = parseFloat(t.amount);
+        }
+      });
+
+    // Convert to chart data with DIFFERENT colors
+    const chartData = Object.keys(expensesByCategory).map(category => ({
+      category,
+      value: expensesByCategory[category],
+      color: CATEGORY_COLORS[category] || '#6b7280',
+    }));
+
+    setCategoryData(chartData);
+  };
+
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(period);
+    filterByPeriod(allTransactions, period);
+  };
 
   const savingsRate = summary.totalIncome > 0 
     ? ((summary.balance / summary.totalIncome) * 100).toFixed(1)
     : 0;
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366f1" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={colors.gradients.primary}
+        colors={['#6366f1', '#8b5cf6']}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -97,7 +154,7 @@ const ReportsScreen = ({ navigation }) => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.white} />
+            <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Reports</Text>
           <View style={{ width: 40 }} />
@@ -117,7 +174,7 @@ const ReportsScreen = ({ navigation }) => {
                 styles.periodButton,
                 selectedPeriod === period && styles.periodButtonActive,
               ]}
-              onPress={() => setSelectedPeriod(period)}
+              onPress={() => handlePeriodChange(period)}
             >
               <Text
                 style={[
@@ -137,32 +194,40 @@ const ReportsScreen = ({ navigation }) => {
             icon="trending-up"
             label="Total Income"
             amount={summary.totalIncome}
-            color={colors.success}
-            gradient={colors.gradients.green}
+            color="#10b981"
+            gradient={['#10b981', '#059669']}
           />
           <SummaryCard
             icon="trending-down"
             label="Total Expense"
             amount={summary.totalExpense}
-            color={colors.error}
-            gradient={colors.gradients.sunset}
+            color="#ef4444"
+            gradient={['#ef4444', '#dc2626']}
           />
           <SummaryCard
             icon="wallet"
             label="Balance"
             amount={summary.balance}
-            color={colors.primary}
-            gradient={colors.gradients.primary}
+            color={summary.balance >= 0 ? '#10b981' : '#ef4444'}
+            gradient={summary.balance >= 0 ? ['#10b981', '#059669'] : ['#ef4444', '#dc2626']}
           />
           <SummaryCard
-            icon="save"
+            icon="trending-up"
             label="Savings Rate"
             amount={savingsRate}
             suffix="%"
             prefix=""
-            color={colors.info}
-            gradient={colors.gradients.ocean}
+            color="#06b6d4"
+            gradient={['#06b6d4', '#0891b2']}
           />
+        </View>
+
+        {/* Transaction Count */}
+        <View style={styles.countCard}>
+          <Ionicons name="receipt-outline" size={24} color="#6366f1" />
+          <Text style={styles.countText}>
+            {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} in {selectedPeriod}
+          </Text>
         </View>
 
         {/* Expense Breakdown */}
@@ -175,39 +240,17 @@ const ReportsScreen = ({ navigation }) => {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="pie-chart-outline" size={64} color={colors.gray300} />
-            <Text style={styles.emptyText}>No expenses to show</Text>
-            <Text style={styles.emptySubtext}>Start adding expenses to see reports</Text>
+            <Ionicons name="pie-chart-outline" size={64} color="#d1d5db" />
+            <Text style={styles.emptyText}>No expenses in {selectedPeriod}</Text>
+            <Text style={styles.emptySubtext}>
+              {selectedPeriod === 'This Month' 
+                ? 'Start adding expenses to see your spending breakdown'
+                : 'No transactions found for this period'}
+            </Text>
           </View>
         )}
 
-        {/* Category Details */}
-        {categoryData.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Category Details</Text>
-            <View style={styles.categoryList}>
-              {categoryData.map((item, index) => (
-                <View key={index} style={styles.categoryItem}>
-                  <View style={styles.categoryLeft}>
-                    <View style={[styles.categoryDot, { backgroundColor: item.color }]} />
-                    <Text style={styles.categoryName}>{item.category}</Text>
-                  </View>
-                  <View style={styles.categoryRight}>
-                    <Text style={styles.categoryAmount}>
-                      ₹{item.value.toLocaleString('en-IN')}
-                    </Text>
-                    <Text style={styles.categoryPercent}>
-                      {((item.value / summary.totalExpense) * 100).toFixed(1)}%
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Spacing for bottom */}
-        <View style={{ height: spacing.xxl }} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -218,7 +261,7 @@ const SummaryCard = ({ icon, label, amount, color, gradient, prefix = '₹', suf
   <View style={styles.summaryCard}>
     <GlassCard gradient gradientColors={gradient}>
       <View style={styles.summaryCardIcon}>
-        <Ionicons name={icon} size={24} color={colors.white} />
+        <Ionicons name={icon} size={24} color="#fff" />
       </View>
       <Text style={styles.summaryCardLabel}>{label}</Text>
       <Text style={styles.summaryCardAmount}>
@@ -231,7 +274,7 @@ const SummaryCard = ({ icon, label, amount, color, gradient, prefix = '₹', suf
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#f8fafc',
   },
   loadingContainer: {
     flex: 1,
@@ -240,8 +283,8 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 60,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
   },
   headerContent: {
     flexDirection: 'row',
@@ -257,48 +300,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.bold,
-    color: colors.white,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 16,
   },
   periodSelector: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.xs,
-    marginTop: spacing.lg,
-    marginBottom: spacing.lg,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 16,
+    marginBottom: 16,
   },
   periodButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.small,
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
   },
   periodButtonActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#6366f1',
   },
   periodButtonText: {
-    fontSize: fontSize.sm,
-    color: colors.gray600,
-    fontWeight: fontWeight.medium,
+    fontSize: 13,
+    color: '#6b7280',
+    fontWeight: '600',
   },
   periodButtonTextActive: {
-    color: colors.white,
+    color: '#fff',
   },
   summaryCards: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: 16,
   },
   summaryCard: {
     width: '48%',
-    marginBottom: spacing.md,
+    marginBottom: 12,
   },
   summaryCardIcon: {
     width: 48,
@@ -307,86 +350,60 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 8,
   },
   summaryCardLabel: {
-    fontSize: fontSize.sm,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: spacing.xs,
+    marginBottom: 4,
   },
   summaryCardAmount: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold,
-    color: colors.white,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  countCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
+  countText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
   },
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold,
-    color: colors.gray900,
-    marginBottom: spacing.md,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: 12,
   },
   chartCard: {
-    padding: spacing.lg,
+    padding: 16,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xxl * 2,
+    paddingVertical: 60,
   },
   emptyText: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.semibold,
-    color: colors.gray600,
-    marginTop: spacing.md,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginTop: 16,
   },
   emptySubtext: {
-    fontSize: fontSize.sm,
-    color: colors.gray400,
-    marginTop: spacing.xs,
-  },
-  categoryList: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.md,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  categoryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  categoryDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: spacing.sm,
-  },
-  categoryName: {
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.medium,
-    color: colors.gray900,
-  },
-  categoryRight: {
-    alignItems: 'flex-end',
-  },
-  categoryAmount: {
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold,
-    color: colors.gray900,
-    marginBottom: 2,
-  },
-  categoryPercent: {
-    fontSize: fontSize.xs,
-    color: colors.gray500,
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });
 

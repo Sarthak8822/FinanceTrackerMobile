@@ -1,4 +1,4 @@
-// screens/BudgetsScreen.js
+// screens/BudgetsScreen.js - FIXED VERSION with Rent category
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {LinearGradient} from 'expo-linear-gradient';
 import { getCurrentUser, getBudgets, createBudget, deleteBudget } from '../services/api';
 
+// UPDATED CATEGORIES with Rent
 const CATEGORIES = [
   { name: 'Food', icon: 'fast-food', color: '#f59e0b', emoji: '🍔' },
   { name: 'Transport', icon: 'car', color: '#3b82f6', emoji: '🚗' },
@@ -25,6 +26,8 @@ const CATEGORIES = [
   { name: 'Entertainment', icon: 'game-controller', color: '#8b5cf6', emoji: '🎮' },
   { name: 'Health', icon: 'fitness', color: '#10b981', emoji: '💊' },
   { name: 'Bills', icon: 'receipt', color: '#ef4444', emoji: '💡' },
+  { name: 'Rent', icon: 'home', color: '#06b6d4', emoji: '🏠' },  // NEW CATEGORY
+  { name: 'Education', icon: 'school', color: '#8b5cf6', emoji: '📚' },
 ];
 
 const BudgetsScreen = ({ navigation }) => {
@@ -32,10 +35,12 @@ const BudgetsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [newBudget, setNewBudget] = useState({
     category: 'Food',
     amount: '',
   });
+  const [user, setUser] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,12 +50,17 @@ const BudgetsScreen = ({ navigation }) => {
 
   const loadBudgets = async () => {
     try {
-      const user = await getCurrentUser();
-      if (!user) return;
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        navigation.replace('Login');
+        return;
+      }
+      setUser(currentUser);
 
-      const data = await getBudgets(user.id);
+      const data = await getBudgets(currentUser.id);
       setBudgets(data);
     } catch (error) {
+      console.error('Load budgets error:', error);
       Alert.alert('Error', 'Failed to load budgets');
     } finally {
       setLoading(false);
@@ -64,27 +74,49 @@ const BudgetsScreen = ({ navigation }) => {
       return;
     }
 
-    try {
-      const user = await getCurrentUser();
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    if (!user) {
+      Alert.alert('Error', 'User not found. Please login again.');
+      return;
+    }
 
-      await createBudget({
+    // Check if budget already exists for this category
+    const existingBudget = budgets.find(b => b.category === newBudget.category);
+    if (existingBudget) {
+      Alert.alert('Error', `Budget for ${newBudget.category} already exists. Please delete it first.`);
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
+
+      const budgetData = {
         userId: user.id,
         category: newBudget.category,
         budgetAmount: parseFloat(newBudget.amount),
         startDate,
         endDate,
         period: 'MONTHLY',
-      });
+      };
 
-      Alert.alert('Success', 'Budget created successfully!');
+      console.log('Creating budget:', budgetData);
+      await createBudget(budgetData);
+
+      Alert.alert('Success', '✅ Budget created successfully!');
       setShowAddModal(false);
       setNewBudget({ category: 'Food', amount: '' });
       loadBudgets();
     } catch (error) {
-      Alert.alert('Error', error.message);
+      console.error('Create budget error:', error);
+      Alert.alert('Error', error.message || 'Failed to create budget');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -100,6 +132,7 @@ const BudgetsScreen = ({ navigation }) => {
           onPress: async () => {
             try {
               await deleteBudget(budgetId);
+              Alert.alert('Success', 'Budget deleted');
               loadBudgets();
             } catch (error) {
               Alert.alert('Error', 'Failed to delete budget');
@@ -258,7 +291,12 @@ const BudgetsScreen = ({ navigation }) => {
             </View>
 
             <Text style={styles.inputLabel}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              style={styles.categoryScroll}
+              contentContainerStyle={{ paddingRight: 20 }}
+            >
               {CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat.name}
@@ -297,8 +335,16 @@ const BudgetsScreen = ({ navigation }) => {
               />
             </View>
 
-            <TouchableOpacity style={styles.createBudgetButton} onPress={handleCreateBudget}>
-              <Text style={styles.createBudgetButtonText}>Create Budget</Text>
+            <TouchableOpacity 
+              style={styles.createBudgetButton} 
+              onPress={handleCreateBudget}
+              disabled={creating}
+            >
+              {creating ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.createBudgetButtonText}>Create Budget</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -497,7 +543,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    minHeight: 400,
+    minHeight: 450,
   },
   modalHeader: {
     flexDirection: 'row',

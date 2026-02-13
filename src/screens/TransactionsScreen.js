@@ -1,4 +1,4 @@
-// screens/TransactionsScreen.js
+// screens/TransactionsScreen.js - UPDATED with Payment Filter & Edit
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -9,18 +9,21 @@ import {
   StyleSheet,
   RefreshControl,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import TransactionItem from '../components/TransactionItem';
 import { getCurrentUser, getTransactions, deleteTransaction } from '../services/api';
 
-const FILTER_OPTIONS = ['All', 'Income', 'Expense'];
+const TYPE_FILTERS = ['All', 'Income', 'Expense'];
+const PAYMENT_FILTERS = ['All', 'CASH', 'UPI', 'CREDIT_CARD', 'DEBIT_CARD', 'NET_BANKING'];
 
 const TransactionsScreen = ({ navigation }) => {
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
-  const [filter, setFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [paymentFilter, setPaymentFilter] = useState('All');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -44,7 +47,7 @@ const TransactionsScreen = ({ navigation }) => {
         new Date(b.transactionDate) - new Date(a.transactionDate)
       );
       setTransactions(sorted);
-      filterTransactions(sorted, filter);
+      applyFilters(sorted, typeFilter, paymentFilter);
     } catch (error) {
       Alert.alert('Error', 'Failed to load transactions');
     } finally {
@@ -53,22 +56,41 @@ const TransactionsScreen = ({ navigation }) => {
     }
   };
 
-  const filterTransactions = (data, selectedFilter) => {
-    if (selectedFilter === 'All') {
-      setFilteredTransactions(data);
-    } else if (selectedFilter === 'Income') {
-      setFilteredTransactions(data.filter(t => t.type === 'INCOME'));
-    } else {
-      setFilteredTransactions(data.filter(t => t.type === 'EXPENSE'));
+  const applyFilters = (data, type, payment) => {
+    let filtered = data;
+
+    // Apply type filter
+    if (type === 'Income') {
+      filtered = filtered.filter(t => t.type === 'INCOME');
+    } else if (type === 'Expense') {
+      filtered = filtered.filter(t => t.type === 'EXPENSE');
     }
+
+    // Apply payment method filter
+    if (payment !== 'All') {
+      filtered = filtered.filter(t => t.paymentMethod === payment);
+    }
+
+    setFilteredTransactions(filtered);
   };
 
-  const handleFilterChange = (newFilter) => {
-    setFilter(newFilter);
-    filterTransactions(transactions, newFilter);
+  const handleTypeFilterChange = (newType) => {
+    setTypeFilter(newType);
+    applyFilters(transactions, newType, paymentFilter);
   };
 
-  const handleDelete = (id) => {
+  const handlePaymentFilterChange = (newPayment) => {
+    setPaymentFilter(newPayment);
+    applyFilters(transactions, typeFilter, newPayment);
+  };
+
+  const handleEdit = (transaction) => {
+    console.log("Transaction::::::::::", transaction)
+    navigation.navigate('EditTransactionScreen', { transaction });
+  };
+
+
+     const handleDelete = (id) => {
     Alert.alert(
       'Delete Transaction',
       'Are you sure you want to delete this transaction?',
@@ -116,7 +138,7 @@ const TransactionsScreen = ({ navigation }) => {
     data: groupedTransactions[date],
   }));
 
-  // Calculate total for each filter
+  // Calculate total
   const getTotal = () => {
     return filteredTransactions.reduce((sum, t) => {
       return t.type === 'INCOME' ? sum + t.amount : sum - t.amount;
@@ -138,21 +160,21 @@ const TransactionsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Filter Bar */}
+      {/* Type Filter Bar */}
       <View style={styles.filterBar}>
-        {FILTER_OPTIONS.map((option) => (
+        {TYPE_FILTERS.map((option) => (
           <TouchableOpacity
             key={option}
             style={[
               styles.filterButton,
-              filter === option && styles.filterButtonActive,
+              typeFilter === option && styles.filterButtonActive,
             ]}
-            onPress={() => handleFilterChange(option)}
+            onPress={() => handleTypeFilterChange(option)}
           >
             <Text
               style={[
                 styles.filterText,
-                filter === option && styles.filterTextActive,
+                typeFilter === option && styles.filterTextActive,
               ]}
             >
               {option}
@@ -161,10 +183,40 @@ const TransactionsScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Total Summary */}
+      {/* Payment Method Filter */}
+      <View style={styles.paymentFilterContainer}>
+        <Text style={styles.filterLabel}>Payment Method:</Text>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.paymentFilterScroll}
+        >
+          {PAYMENT_FILTERS.map((method) => (
+            <TouchableOpacity
+              key={method}
+              style={[
+                styles.paymentFilterChip,
+                paymentFilter === method && styles.paymentFilterChipActive,
+              ]}
+              onPress={() => handlePaymentFilterChange(method)}
+            >
+              <Text
+                style={[
+                  styles.paymentFilterText,
+                  paymentFilter === method && styles.paymentFilterTextActive,
+                ]}
+              >
+                {method === 'All' ? 'All' : method.replace('_', ' ')}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Summary Card */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>
-          {filter === 'All' ? 'Net Balance' : filter === 'Income' ? 'Total Income' : 'Total Expense'}
+          {typeFilter === 'All' ? 'Net Balance' : typeFilter === 'Income' ? 'Total Income' : 'Total Expense'}
         </Text>
         <Text 
           style={[
@@ -177,6 +229,9 @@ const TransactionsScreen = ({ navigation }) => {
         <Text style={styles.summaryCount}>
           {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
         </Text>
+        {paymentFilter !== 'All' && (
+          <Text style={styles.summaryPayment}>via {paymentFilter.replace('_', ' ')}</Text>
+        )}
       </View>
 
       {/* Transactions List */}
@@ -191,8 +246,10 @@ const TransactionsScreen = ({ navigation }) => {
                 <TransactionItem
                   key={transaction.id}
                   transaction={transaction}
-                  onPress={() => navigation.navigate('TransactionDetail', { transaction })}
+                  onPress={() => navigation.navigate('TransactionDetailScreen', { transaction })}
+                  onEdit={() => navigation.navigate('EditTransactionScreen', { transaction })}
                   onDelete={handleDelete}
+                  showEdit={true}
                 />
               ))}
             </View>
@@ -206,9 +263,12 @@ const TransactionsScreen = ({ navigation }) => {
       ) : (
         <View style={styles.emptyState}>
           <Ionicons name="receipt-outline" size={64} color="#d1d5db" />
-          <Text style={styles.emptyText}>No transactions yet</Text>
+          <Text style={styles.emptyText}>No transactions found</Text>
           <Text style={styles.emptySubtext}>
-            Start adding your {filter.toLowerCase()} transactions
+            {paymentFilter !== 'All' 
+              ? `No ${typeFilter.toLowerCase()} transactions via ${paymentFilter.replace('_', ' ')}`
+              : `No ${typeFilter.toLowerCase()} transactions yet`
+            }
           </Text>
           <TouchableOpacity
             style={styles.addButton}
@@ -277,6 +337,44 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: '#fff',
   },
+  paymentFilterContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingLeft: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 8,
+  },
+  paymentFilterScroll: {
+    flexDirection: 'row',
+  },
+  paymentFilterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  paymentFilterChipActive: {
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
+  },
+  paymentFilterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'capitalize',
+  },
+  paymentFilterTextActive: {
+    color: '#fff',
+  },
   summaryCard: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
@@ -304,6 +402,13 @@ const styles = StyleSheet.create({
   summaryCount: {
     fontSize: 13,
     color: '#9ca3af',
+  },
+  summaryPayment: {
+    fontSize: 12,
+    color: '#6366f1',
+    marginTop: 4,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
   listContent: {
     paddingHorizontal: 16,

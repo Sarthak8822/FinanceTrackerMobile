@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // IMPORTANT: iOS Simulator ke liye localhost kaam karta hai
 // Real device ke liye apne computer ka IP use karo
 // Example: const API_BASE_URL = 'http://192.168.1.100:8080/api';
-const API_BASE_URL = 'http://192.168.0.100:8080/api';
+const API_BASE_URL = 'http://192.168.1.11:8080/api';
 
 // Axios instance with default configuration
 const api = axios.create({
@@ -126,7 +126,7 @@ export const addTransaction = async (transactionData) => {
 export const getTransactions = async (userId) => {
   try {
     const response = await api.get(`/transactions/user/${userId}`);
-    return response.data;
+    return response.data.sort((a, b) => new Date(b.transactionDate) - new Date(a.transactionDate));
   } catch (error) {
     throw error.response?.data?.message || 'Failed to fetch transactions';
   }
@@ -169,6 +169,21 @@ export const deleteTransaction = async (transactionId) => {
     return response.data;
   } catch (error) {
     throw error.response?.data?.message || 'Failed to delete transaction';
+  }
+};
+
+
+
+
+export const updateTransaction = async (transactionId, transactionData) => {
+  try {
+    const response = await api.put(
+      `/transactions/${transactionId}`,
+      transactionData
+    );
+    return response.data;
+  } catch (error) {
+    throw handleApiError(error);
   }
 };
 

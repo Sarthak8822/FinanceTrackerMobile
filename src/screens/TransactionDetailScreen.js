@@ -44,8 +44,8 @@ const TransactionDetailScreen = ({ navigation, route }) => {
     );
   };
 
-  const handleEdit = () => {
-    Alert.alert('Coming Soon', 'Edit transaction feature will be available soon!');
+  const handleEdit = (transaction) => {
+    navigation.navigate('EditTransactionScreen', { transaction });
   };
 
   const formatDate = (dateString) => {
@@ -75,7 +75,7 @@ const TransactionDetailScreen = ({ navigation, route }) => {
           <Text style={styles.headerTitle}>Transaction Details</Text>
           <TouchableOpacity 
             style={styles.editButton}
-            onPress={handleEdit}
+            onPress={()=> navigation.navigate('EditTransactionScreen', { transaction })}
           >
             <Ionicons name="create-outline" size={24} color="#fff" />
           </TouchableOpacity>
@@ -144,7 +144,7 @@ const TransactionDetailScreen = ({ navigation, route }) => {
 
         {/* Actions */}
         <View style={styles.actionsCard}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('EditTransactionScreen', { transaction })}>
             <View style={[styles.actionIconContainer, { backgroundColor: '#3b82f620' }]}>
               <Ionicons name="create-outline" size={24} color="#3b82f6" />
             </View>

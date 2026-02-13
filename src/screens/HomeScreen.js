@@ -202,7 +202,9 @@ const HomeScreen = ({ navigation }) => {
 
           {recentTransactions.length > 0 ? (
             <View style={styles.transactionList}>
-              {recentTransactions.map((transaction) => (
+              {[...recentTransactions] // 1. Copy the array to avoid mutation
+              .sort((a, b) => new Date(b.date) - new Date(a.date)) // 2. Sort by date (Newest first)
+              .map((transaction) => (
                 <TransactionItem
                   key={transaction.id}
                   transaction={transaction}
